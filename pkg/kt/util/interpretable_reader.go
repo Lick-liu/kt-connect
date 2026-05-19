@@ -1,16 +1,21 @@
 package util
 
-import "io"
+import (
+	"io"
+	"sync"
+)
 
 type InterpretableReader struct {
 	r         io.Reader
-	interrupt chan int
+	interrupt chan struct{}
+	cancel    *sync.Once
 }
 
 func NewInterpretableReader(r io.Reader) InterpretableReader {
 	return InterpretableReader{
 		r,
-		make(chan int),
+		make(chan struct{}),
+		&sync.Once{},
 	}
 }
 
@@ -20,7 +25,6 @@ func (r InterpretableReader) Read(p []byte) (n int, err error) {
 	}
 	select {
 	case <-r.interrupt:
-		r.r = nil
 		return 0, io.EOF
 	default:
 		return r.r.Read(p)
@@ -28,5 +32,7 @@ func (r InterpretableReader) Read(p []byte) (n int, err error) {
 }
 
 func (r InterpretableReader) Cancel() {
-	r.interrupt <- 0
+	r.cancel.Do(func() {
+		close(r.interrupt)
+	})
 }
