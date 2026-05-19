@@ -16,7 +16,7 @@ import (
 	"github.com/wzshiming/sshproxy"
 )
 
-type SocksLogger struct {}
+type SocksLogger struct{}
 
 func (s SocksLogger) Println(v ...any) {
 	_, _ = util.BackgroundLogger.Write([]byte(fmt.Sprint(v...) + util.Eol))
@@ -155,9 +155,9 @@ func handleClient(client net.Conn, remote net.Conn) {
 	go func() {
 		defer handleBrokenTunnel(done)
 		if _, err := io.Copy(client, remoteReader); err != nil {
-			log.Warn().Err(err).Msgf("Error while copy remote->local")
+			logCopyError(err, "remote->local")
 		}
-		done<-1
+		done <- 1
 	}()
 
 	// Start local -> remote data transfer
@@ -165,9 +165,9 @@ func handleClient(client net.Conn, remote net.Conn) {
 	go func() {
 		defer handleBrokenTunnel(done)
 		if _, err := io.Copy(remote, localReader); err != nil {
-			log.Warn().Err(err).Msgf("Error while copy local->remote")
+			logCopyError(err, "local->remote")
 		}
-		done<-1
+		done <- 1
 	}()
 
 	<-done
@@ -177,9 +177,26 @@ func handleClient(client net.Conn, remote net.Conn) {
 	_ = client.Close()
 }
 
+func logCopyError(err error, direction string) {
+	if shouldIgnoreCopyError(err) {
+		log.Debug().Err(err).Msgf("Ignore closed tunnel copy %s", direction)
+		return
+	}
+
+	log.Warn().Err(err).Msgf("Error while copy %s", direction)
+}
+
+func shouldIgnoreCopyError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return errors.Is(err, net.ErrClosed) || strings.Contains(err.Error(), "use of closed network connection")
+}
+
 func handleBrokenTunnel(done chan int) {
 	if r := recover(); r != nil {
 		log.Error().Msgf("Ssh tunnel broken: %v", r)
-		done<-1
+		done <- 1
 	}
 }
