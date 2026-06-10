@@ -20,9 +20,9 @@ const (
 	ComponentForward = "forward"
 
 	// ImageKtShadow default shadow image
-	ImageKtShadow = "registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-shadow"
+	ImageKtShadow = "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-shadow"
 	// ImageKtRouter default router image
-	ImageKtRouter = "registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-router"
+	ImageKtRouter = "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-router"
 	// ImageKtNavigator default navigator image
 	ImageKtNavigator = "registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-navigator"
 
