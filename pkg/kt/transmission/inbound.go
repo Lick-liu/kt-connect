@@ -32,7 +32,7 @@ func ForwardPodToLocal(exposePorts, podName, privateKey string) (int, error) {
 func ForwardRemotePortsViaSshTunnel(exposePorts string, localSshPort int, privateKey string) error {
 	// supports multi port-pairs
 	portPairs := strings.Split(exposePorts, ",")
-	res := make(chan error)
+	res := make(chan error, len(portPairs))
 	for _, exposePort := range portPairs {
 		localPort, remotePort, err2 := util.ParsePortMapping(exposePort)
 		if err2 != nil {
@@ -44,10 +44,6 @@ func ForwardRemotePortsViaSshTunnel(exposePorts string, localSshPort int, privat
 	case err := <-res:
 		return err
 	case <-time.After(1 * time.Second):
-		go func() {
-			// consume the res channel to avoid block reverse tunnel
-			<-res
-		}()
 	}
 	return nil
 }
@@ -58,23 +54,35 @@ func forwardRemotePortViaSshTunnel(localPort, remotePort, localSshPort int, priv
 	localEndpoint := fmt.Sprintf("0.0.0.0:%d", remotePort)
 	sshAddress := fmt.Sprintf("127.0.0.1:%d", localPort)
 	log.Debug().Msgf("Forwarding %s to local endpoint %s via %s", remoteEndpoint, localEndpoint, sshAddress)
-	sshReverseTunnel(privateKey, remoteEndpoint, localEndpoint, sshAddress, res)
+	sshReverseTunnel(privateKey, remoteEndpoint, localEndpoint, sshAddress, res, 0)
 }
 
-func sshReverseTunnel(privateKey, remoteEndpoint, localEndpoint, sshAddress string, res chan error) {
+func sshReverseTunnel(privateKey, remoteEndpoint, localEndpoint, sshAddress string, res chan error, failures int) {
 	go func() {
+		started := time.Now()
 		err := sshchannel.Ins().ForwardRemoteToLocal(privateKey, remoteEndpoint, localEndpoint, sshAddress)
 		if err != nil {
 			if res != nil {
 				log.Error().Err(err).Msgf("Failed to setup reverse tunnel")
-				res <-err
+				select {
+				case res <- err:
+				default:
+				}
 			} else {
 				log.Debug().Err(err).Msgf("Reverse tunnel interrupted")
 			}
 		}
 
+		stable := time.Since(started) >= reconnectStableDuration
+		nextFailures := nextReconnectFailures(failures, stable)
+		if ExitAfterRepeatedReconnectFailures("Reverse tunnel", nextFailures) {
+			return
+		}
 		time.Sleep(10 * time.Second)
 		log.Debug().Msgf("Reverse tunnel reconnecting ...")
-		sshReverseTunnel(privateKey, remoteEndpoint, localEndpoint, sshAddress, nil)
+		if stable {
+			res = nil
+		}
+		sshReverseTunnel(privateKey, remoteEndpoint, localEndpoint, sshAddress, res, nextFailures)
 	}()
 }

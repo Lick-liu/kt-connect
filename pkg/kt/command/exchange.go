@@ -14,13 +14,13 @@ import (
 // NewExchangeCommand return new exchange command
 func NewExchangeCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:  "exchange",
+		Use:   "exchange",
 		Short: "Redirect all requests of specified kubernetes service to local",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return fmt.Errorf("name of service to exchange is required")
 			} else if len(args) > 1 {
-				return fmt.Errorf("too many service names are spcified (%s), should be one", strings.Join(args, ",") )
+				return fmt.Errorf("too many service names are spcified (%s), should be one", strings.Join(args, ","))
 			}
 			return general.Prepare()
 		},
@@ -35,14 +35,14 @@ func NewExchangeCommand() *cobra.Command {
 	return cmd
 }
 
-//Exchange exchange kubernetes workload
+// Exchange exchange kubernetes workload
 func Exchange(resourceName string) error {
 	ch, err := general.SetupProcess(util.ComponentExchange)
 	if err != nil {
 		return err
 	}
 
-	if opt.Get().Exchange.SkipPortChecking {
+	if shouldCheckLocalPorts(opt.Get().Exchange.SkipPortChecking) {
 		if port := util.FindBrokenLocalPort(opt.Get().Exchange.Expose); port != "" {
 			return fmt.Errorf("no application is running on port %s", port)
 		}

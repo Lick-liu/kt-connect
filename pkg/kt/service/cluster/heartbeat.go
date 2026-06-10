@@ -41,10 +41,12 @@ func SetupTimeDifference() error {
 	rectifierPodName := fmt.Sprintf("%s%s", util.RectifierPodPrefix, strings.ToLower(util.RandomString(5)))
 	_, err := Ins().CreateRectifierPod(rectifierPodName)
 	if err != nil {
+		_ = Ins().RemovePod(rectifierPodName, opt.Get().Global.Namespace)
 		return err
 	}
 	stdout, stderr, err := Ins().ExecInPod(util.DefaultContainer, rectifierPodName, opt.Get().Global.Namespace, "date", "+%s")
 	if err != nil {
+		_ = Ins().RemovePod(rectifierPodName, opt.Get().Global.Namespace)
 		return err
 	}
 	go func() {
