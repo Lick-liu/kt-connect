@@ -5,6 +5,7 @@ import (
 	"github.com/alibaba/kt-connect/pkg/kt/util"
 	"github.com/rs/zerolog/log"
 	coreV1 "k8s.io/api/core/v1"
+	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labelApi "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -68,9 +69,16 @@ func (k *Kubernetes) UpdateService(svc *coreV1.Service) (*coreV1.Service, error)
 // RemoveService remove service
 func (k *Kubernetes) RemoveService(name, namespace string) (err error) {
 	deletePolicy := metav1.DeletePropagationBackground
-	return k.Clientset.CoreV1().Services(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{
+	err = k.Clientset.CoreV1().Services(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	})
+	if err != nil && !k8sErrors.IsNotFound(err) {
+		return err
+	}
+	if cleanupErr := k.cleanupManualServiceEndpoints(name, namespace); cleanupErr != nil {
+		return cleanupErr
+	}
+	return err
 }
 
 func (k *Kubernetes) UpdateServiceHeartBeat(name, namespace string) {

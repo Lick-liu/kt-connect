@@ -69,7 +69,7 @@ func GlobalFlags() []OptionConfig {
 		},
 		{
 			Target:       "PodCreationTimeout",
-			DefaultValue: 60,
+			DefaultValue: 180,
 			Description:  "Seconds to wait before shadow or router pod creation timeout",
 		},
 		{

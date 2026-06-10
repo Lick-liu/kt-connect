@@ -84,6 +84,10 @@ func setupTunRoute() error {
 }
 
 func startSocks5Connection(podIP, privateKey string, localSshPort int, isInitConnect bool) error {
+	return startSocks5ConnectionOnce(podIP, privateKey, localSshPort, isInitConnect)
+}
+
+func startSocks5ConnectionOnce(podIP, privateKey string, localSshPort int, isInitConnect bool) error {
 	var res = make(chan error)
 	var ticker *time.Ticker
 	sshAddress := fmt.Sprintf("%s:%d", common.LocalhostIp6, localSshPort)
@@ -93,15 +97,14 @@ func startSocks5Connection(podIP, privateKey string, localSshPort int, isInitCon
 		// will hang here if not error happen
 		err := sshchannel.Ins().StartSocks5Proxy(privateKey, sshAddress, socks5Address)
 		if !gone {
-			res <-err
+			res <- err
+			return
 		}
 		log.Debug().Err(err).Msgf("Socks proxy interrupted")
 		if ticker != nil {
 			ticker.Stop()
 		}
-		time.Sleep(10 * time.Second)
-		log.Debug().Msgf("Socks proxy reconnecting ...")
-		_ = startSocks5Connection(podIP, privateKey, localSshPort, false)
+		reconnectSocks5Connection(podIP, privateKey, localSshPort)
 	}()
 	select {
 	case err := <-res:
@@ -114,6 +117,23 @@ func startSocks5Connection(podIP, privateKey string, localSshPort int, isInitCon
 		log.Info().Msgf("Socks proxy established")
 		gone = true
 		return nil
+	}
+}
+
+func reconnectSocks5Connection(podIP, privateKey string, localSshPort int) {
+	failures := 0
+	for {
+		time.Sleep(10 * time.Second)
+		log.Debug().Msgf("Socks proxy reconnecting ...")
+		if err := startSocks5ConnectionOnce(podIP, privateKey, localSshPort, false); err != nil {
+			failures++
+			if transmission.ExitAfterRepeatedReconnectFailures("Socks proxy", failures) {
+				return
+			}
+			log.Debug().Err(err).Msgf("Socks proxy reconnect failed")
+			continue
+		}
+		return
 	}
 }
 

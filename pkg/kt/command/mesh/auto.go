@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+const staleMeshShadowThresholdMinutes = int64(util.ResourceHeartBeatIntervalMinus*2 + 1)
+
 func AutoMesh(svc *coreV1.Service) error {
 	// Lock service to avoid conflict, must be first step
 	svc, err := general.LockService(svc.Name, opt.Get().Global.Namespace, 0)
@@ -70,7 +72,7 @@ func AutoMesh(svc *coreV1.Service) error {
 		util.KtRole:   util.RoleMeshShadow,
 		util.KtTarget: util.RandomString(20),
 	}
-	if err = createShadowService(shadowName, ports, shadowLabels); err != nil {
+	if err = createShadowService(shadowName, ports); err != nil {
 		return err
 	}
 
@@ -78,7 +80,7 @@ func AutoMesh(svc *coreV1.Service) error {
 	// Must after stuntman service and shadow service, otherwise will cause 'host not found in upstream' error
 	routerPodName := svc.Name + util.RouterPodSuffix
 	routerLabels := map[string]string{
-		util.KtRole:   util.RoleRouter,
+		util.KtRole: util.RoleRouter,
 	}
 	if err = createRouter(routerPodName, svc.Name, ports, routerLabels, versionMark); err != nil {
 		return err
@@ -99,10 +101,35 @@ func AutoMesh(svc *coreV1.Service) error {
 		shadowLabels, annotations, portToNames); err != nil {
 		return err
 	}
+	if err = reconcileShadowEndpoint(shadowName, ports); err != nil {
+		return err
+	}
+	startShadowEndpointReconcile(shadowName, ports)
 	log.Info().Msg("---------------------------------------------------------------")
 	log.Info().Msgf(" Now you can access your service by header '%s: %s' ", strings.ToUpper(meshKey), meshVersion)
 	log.Info().Msg("---------------------------------------------------------------")
 	return nil
+}
+
+func reconcileShadowEndpoint(shadowName string, ports map[int]int) error {
+	namespace := opt.Get().Global.Namespace
+	pod, err := cluster.Ins().GetPod(shadowName, namespace)
+	if err != nil {
+		return err
+	}
+	return cluster.Ins().ReconcileServiceEndpoint(shadowName, namespace, pod, ports)
+}
+
+func startShadowEndpointReconcile(shadowName string, ports map[int]int) {
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := reconcileShadowEndpoint(shadowName, ports); err != nil {
+				log.Warn().Err(err).Msgf("Failed to reconcile endpoint for shadow service %s", shadowName)
+			}
+		}
+	}()
 }
 
 func isNameUsable(name, meshVersion string, times int) error {
@@ -112,15 +139,47 @@ func isNameUsable(name, meshVersion string, times int) error {
 	shadowName := name + util.MeshPodInfix + meshVersion
 	if pod, err := cluster.Ins().GetPod(shadowName, opt.Get().Global.Namespace); err == nil {
 		if pod.DeletionTimestamp == nil {
+			if isStaleMeshShadow(pod) {
+				log.Warn().Msgf("Found stale meshing pod %s, cleaning it before creating a new one", shadowName)
+				if err = cleanStaleMeshShadow(shadowName, opt.Get().Global.Namespace); err != nil {
+					return err
+				}
+				return isNameUsable(name, meshVersion, times+1)
+			}
 			msg := fmt.Sprintf("Another user is meshing service '%s' via version '%s'", name, meshVersion)
 			if opt.Get().Mesh.VersionMark != "" {
 				return fmt.Errorf("%s, please specify a different version mark", msg)
 			}
-			return fmt.Errorf( "%s, please retry or use '--versionMark' parameter to spcify an uniq one", msg)
+			return fmt.Errorf("%s, please retry or use '--versionMark' parameter to spcify an uniq one", msg)
 		}
 		log.Info().Msgf("Previous meshing pod for service '%s' not finished yet, waiting ...", name)
 		time.Sleep(3 * time.Second)
-		return isNameUsable(name, meshVersion, times + 1)
+		return isNameUsable(name, meshVersion, times+1)
+	}
+	return nil
+}
+
+func isStaleMeshShadow(pod *coreV1.Pod) bool {
+	if pod == nil || pod.Annotations == nil {
+		return false
+	}
+	lastHeartBeat := util.ParseTimestamp(pod.Annotations[util.KtLastHeartBeat])
+	return lastHeartBeat >= 0 && util.GetTime()-lastHeartBeat > staleMeshShadowThresholdMinutes*60
+}
+
+func cleanStaleMeshShadow(shadowName, namespace string) error {
+	if err := cluster.Ins().RemoveService(shadowName, namespace); err != nil && !k8sErrors.IsNotFound(err) {
+		return err
+	}
+	if err := cluster.Ins().RemoveConfigMap(shadowName, namespace); err != nil && !k8sErrors.IsNotFound(err) {
+		return err
+	}
+	if err := cluster.Ins().RemovePod(shadowName, namespace); err != nil && !k8sErrors.IsNotFound(err) {
+		return err
+	}
+	_, err := cluster.Ins().WaitPodTerminate(shadowName, namespace)
+	if err != nil && !k8sErrors.IsNotFound(err) {
+		return err
 	}
 	return nil
 }
@@ -136,8 +195,7 @@ func sanityCheck(svc *coreV1.Service) error {
 	return nil
 }
 
-func createShadowService(shadowSvcName string, ports map[int]int,
-	selectors map[string]string) error {
+func createShadowService(shadowSvcName string, ports map[int]int) error {
 	if _, err := cluster.Ins().CreateService(&cluster.SvcMetaAndSpec{
 		Meta: &cluster.ResourceMeta{
 			Name:        shadowSvcName,
@@ -147,7 +205,7 @@ func createShadowService(shadowSvcName string, ports map[int]int,
 		},
 		External:  false,
 		Ports:     ports,
-		Selectors: selectors,
+		Selectors: nil,
 	}); err != nil {
 		return err
 	}
@@ -171,6 +229,7 @@ func createRouter(routerPodName string, svcName string, ports map[int]int, label
 		// Router not exist or just terminated
 		labels[util.KtTarget] = util.RandomString(20)
 		annotations := map[string]string{util.KtRefCount: "1", util.KtConfig: fmt.Sprintf("service=%s", svcName)}
+		opt.Store.Router = routerPodName
 		if _, err = cluster.Ins().CreateRouterPod(routerPodName, labels, annotations, ports); err != nil {
 			log.Error().Err(err).Msgf("Failed to create router pod")
 			return err

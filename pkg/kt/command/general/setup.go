@@ -15,8 +15,8 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	"syscall"
 	"strings"
+	"syscall"
 )
 
 // Prepare setup log level, time difference and kube config
@@ -33,7 +33,8 @@ func Prepare() error {
 
 	if !opt.Get().Global.UseLocalTime {
 		if err := cluster.SetupTimeDifference(); err != nil {
-			return err
+			util.TimeDifference = 0
+			log.Warn().Err(err).Msgf("Failed to fetch cluster time, using local time for resource heartbeat")
 		}
 	}
 	return nil
@@ -58,13 +59,14 @@ func SetupProcess(componentName string) (chan os.Signal, error) {
 	ch := make(chan os.Signal)
 	signal.Notify(ch, os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
 	opt.Store.Component = componentName
+	opt.Store.SessionID = fmt.Sprintf("%s-%d-%s", componentName, os.Getpid(), strings.ToLower(util.RandomString(6)))
 	return ch, util.WritePidFile(componentName, ch)
 }
 
 // combineKubeOpts set default options of kubectl if not assign
 func combineKubeOpts() (err error) {
 	var config *clientcmdapi.Config
-	if opt.Get().Global.Kubeconfig != ""{
+	if opt.Get().Global.Kubeconfig != "" {
 		// if kubeconfig specified, always read from it
 		_ = os.Setenv(util.EnvKubeConfig, opt.Get().Global.Kubeconfig)
 		config, err = clientcmd.NewDefaultClientConfigLoadingRules().Load()
