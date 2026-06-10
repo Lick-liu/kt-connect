@@ -24,6 +24,7 @@ func getKubernetesClient(kubeConfig string) (clientset *kubernetes.Clientset, er
 func createService(metaAndSpec *SvcMetaAndSpec) *coreV1.Service {
 	var servicePorts []coreV1.ServicePort
 	metaAndSpec.Meta.Annotations = util.MapPut(metaAndSpec.Meta.Annotations, util.KtLastHeartBeat, util.GetTimestamp())
+	metaAndSpec.Meta.Annotations = runtimeAnnotations(metaAndSpec.Meta.Annotations)
 	metaAndSpec.Meta.Labels = util.MergeMap(metaAndSpec.Meta.Labels, map[string]string{util.ControlBy: util.KubernetesToolkit})
 
 	for srcPort, targetPort := range metaAndSpec.Ports {
@@ -56,6 +57,7 @@ func createService(metaAndSpec *SvcMetaAndSpec) *coreV1.Service {
 func createDeployment(metaAndSpec *PodMetaAndSpec) *appV1.Deployment {
 	metaAndSpec.Meta.Annotations = util.MapPut(metaAndSpec.Meta.Annotations, util.KtRefCount, "1")
 	metaAndSpec.Meta.Annotations = util.MapPut(metaAndSpec.Meta.Annotations, util.KtLastHeartBeat, util.GetTimestamp())
+	metaAndSpec.Meta.Annotations = runtimeAnnotations(metaAndSpec.Meta.Annotations)
 
 	var originLabels = make(map[string]string, 0)
 	for k, v := range metaAndSpec.Meta.Labels {
@@ -87,6 +89,7 @@ func createDeployment(metaAndSpec *PodMetaAndSpec) *appV1.Deployment {
 func createPod(metaAndSpec *PodMetaAndSpec) *coreV1.Pod {
 	metaAndSpec.Meta.Annotations = util.MapPut(metaAndSpec.Meta.Annotations, util.KtRefCount, "1")
 	metaAndSpec.Meta.Annotations = util.MapPut(metaAndSpec.Meta.Annotations, util.KtLastHeartBeat, util.GetTimestamp())
+	metaAndSpec.Meta.Annotations = runtimeAnnotations(metaAndSpec.Meta.Annotations)
 	metaAndSpec.Meta.Labels = util.MergeMap(metaAndSpec.Meta.Labels, map[string]string{util.ControlBy: util.KubernetesToolkit})
 
 	pod := &coreV1.Pod{
@@ -115,6 +118,19 @@ func createPod(metaAndSpec *PodMetaAndSpec) *coreV1.Pod {
 	return pod
 }
 
+func runtimeAnnotations(annotations map[string]string) map[string]string {
+	if opt.Store.SessionID != "" {
+		annotations = util.MapPut(annotations, util.KtSessionID, opt.Store.SessionID)
+	}
+	if opt.Store.Component != "" {
+		annotations = util.MapPut(annotations, util.KtComponent, opt.Store.Component)
+	}
+	if opt.Store.Mesh != "" {
+		annotations = util.MapPut(annotations, util.KtVersionMark, opt.Store.Mesh)
+	}
+	return annotations
+}
+
 func createContainer(image string, args []string, envs map[string]string, ports map[string]int) coreV1.Container {
 	var envVar []coreV1.EnvVar
 	for k, v := range envs {
@@ -141,7 +157,7 @@ func createContainer(image string, args []string, envs map[string]string, ports 
 		},
 		Ports: []coreV1.ContainerPort{},
 		Resources: coreV1.ResourceRequirements{
-			Limits: coreV1.ResourceList{},
+			Limits:   coreV1.ResourceList{},
 			Requests: coreV1.ResourceList{},
 		},
 	}
@@ -150,8 +166,8 @@ func createContainer(image string, args []string, envs map[string]string, ports 
 	}
 	for name, port := range ports {
 		container.Ports = append(container.Ports, coreV1.ContainerPort{
-			Name: name,
-			Protocol: coreV1.ProtocolTCP,
+			Name:          name,
+			Protocol:      coreV1.ProtocolTCP,
 			ContainerPort: int32(port),
 		})
 	}

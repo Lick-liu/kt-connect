@@ -91,7 +91,7 @@ func remove(args []string) {
 	header, version := splitVersionMark(args[0])
 	err := updateRoute(header, version, actionRemove)
 	if err != nil {
-		log.Error().Err(err).Msgf("Update route with remove failed" )
+		log.Error().Err(err).Msgf("Update route with remove failed")
 		return
 	}
 	log.Info().Msgf("Route updated.")
@@ -120,15 +120,9 @@ func updateRoute(header, version, action string) error {
 	}
 	switch action {
 	case actionAdd:
-		ktConf.Versions = append(ktConf.Versions, version)
+		ktConf.Versions = addVersion(ktConf.Versions, version)
 	case actionRemove:
-		versions := ktConf.Versions
-		for i, v := range versions {
-			if v == version {
-				ktConf.Versions = append(versions[:i], versions[i+1:]...)
-				break
-			}
-		}
+		ktConf.Versions = removeVersion(ktConf.Versions, version)
 	}
 	err = router.WriteKtConf(ktConf)
 	if err != nil {
@@ -139,4 +133,22 @@ func updateRoute(header, version, action string) error {
 		return err
 	}
 	return nil
+}
+
+func addVersion(versions []string, version string) []string {
+	for _, v := range versions {
+		if v == version {
+			return versions
+		}
+	}
+	return append(versions, version)
+}
+
+func removeVersion(versions []string, version string) []string {
+	for i, v := range versions {
+		if v == version {
+			return append(versions[:i], versions[i+1:]...)
+		}
+	}
+	return versions
 }

@@ -52,12 +52,13 @@ func (k *Kubernetes) createConfigMapWithSshKey(labels map[string]string, sshcm s
 	SetupHeartBeat(sshcm, namespace, k.UpdateConfigMapHeartBeat)
 
 	labels = util.MergeMap(labels, map[string]string{util.ControlBy: util.KubernetesToolkit})
+	annotations := runtimeAnnotations(map[string]string{util.KtLastHeartBeat: util.GetTimestamp()})
 	return k.Clientset.CoreV1().ConfigMaps(namespace).Create(context.TODO(), &coreV1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        sshcm,
 			Namespace:   namespace,
 			Labels:      labels,
-			Annotations: map[string]string{util.KtLastHeartBeat: util.GetTimestamp()},
+			Annotations: annotations,
 		},
 		Data: map[string]string{
 			util.SshAuthKey:        string(generator.PublicKey),

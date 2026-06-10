@@ -21,7 +21,7 @@ func NewPreviewCommand() *cobra.Command {
 			if len(args) == 0 {
 				return fmt.Errorf("a service name must be specified")
 			} else if len(args) > 1 {
-				return fmt.Errorf("too many service names are spcified (%s), should be one", strings.Join(args, ",") )
+				return fmt.Errorf("too many service names are spcified (%s), should be one", strings.Join(args, ","))
 			}
 			return general.Prepare()
 		},
@@ -43,7 +43,7 @@ func Preview(serviceName string) error {
 		return err
 	}
 
-	if opt.Get().Mesh.SkipPortChecking {
+	if shouldCheckLocalPorts(opt.Get().Preview.SkipPortChecking) {
 		if port := util.FindBrokenLocalPort(opt.Get().Preview.Expose); port != "" {
 			return fmt.Errorf("no application is running on port %s", port)
 		}

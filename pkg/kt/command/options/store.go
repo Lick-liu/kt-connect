@@ -17,6 +17,8 @@ type RuntimeStore struct {
 	Version string
 	// Component current sub-command (connect, exchange, mesh or preview)
 	Component string
+	// SessionID identifies resources created by one ktctl process session
+	SessionID string
 	// Shadow pod name
 	Shadow string
 	// Router pod name
