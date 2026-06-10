@@ -2,7 +2,9 @@ package transmission
 
 import (
 	"net/url"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -55,5 +57,25 @@ func Test_parseReqHost(t *testing.T) {
 				t.Errorf("parseReqHost() = %v, want %v", *got, *tt.want)
 			}
 		})
+	}
+}
+
+func TestPortForwardReconnectUsesFailureThreshold(t *testing.T) {
+	content, err := os.ReadFile("portforward.go")
+	if err != nil {
+		t.Fatalf("read portforward.go: %v", err)
+	}
+	if !strings.Contains(string(content), `ExitAfterRepeatedReconnectFailures("Port forward"`) {
+		t.Fatalf("port-forward reconnect path should exit after repeated failures")
+	}
+}
+
+func TestSshuttleReconnectUsesFailureThreshold(t *testing.T) {
+	content, err := os.ReadFile("../command/connect/sshuttle.go")
+	if err != nil {
+		t.Fatalf("read sshuttle.go: %v", err)
+	}
+	if !strings.Contains(string(content), `ExitAfterRepeatedReconnectFailures("sshuttle"`) {
+		t.Fatalf("sshuttle reconnect path should exit after repeated failures")
 	}
 }

@@ -20,3 +20,11 @@ func TestRemoveVersionIsIdempotent(t *testing.T) {
 		t.Fatalf("removeVersion changed versions for missing item: got %v, want %v", got, want)
 	}
 }
+
+func TestRemoveVersionRemovesAllDuplicates(t *testing.T) {
+	got := removeVersion([]string{"jz2", "chrisr3", "jz2", "lick", "jz2"}, "jz2")
+	want := []string{"chrisr3", "lick"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("removeVersion left duplicate versions: got %v, want %v", got, want)
+	}
+}

@@ -145,10 +145,11 @@ func addVersion(versions []string, version string) []string {
 }
 
 func removeVersion(versions []string, version string) []string {
-	for i, v := range versions {
-		if v == version {
-			return append(versions[:i], versions[i+1:]...)
+	remaining := versions[:0]
+	for _, v := range versions {
+		if v != version {
+			remaining = append(remaining, v)
 		}
 	}
-	return versions
+	return remaining
 }

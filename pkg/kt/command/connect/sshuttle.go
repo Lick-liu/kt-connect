@@ -41,17 +41,29 @@ func BySshuttle() error {
 }
 
 func startSshuttle(req *sshuttle.SSHVPNRequest) error {
+	return startSshuttleWithFailures(req, 0)
+}
+
+func startSshuttleWithFailures(req *sshuttle.SSHVPNRequest, failures int) error {
 	res := make(chan error)
 	if err := util.BackgroundRun(sshuttle.Ins().Connect(req), "vpn(sshuttle)", res); err != nil {
 		return err
 	}
 
+	started := time.Now()
 	go func() {
 		select {
 		case <-res:
+			nextFailures := failures + 1
+			if time.Since(started) >= time.Second {
+				nextFailures = 0
+			}
+			if transmission.ExitAfterRepeatedReconnectFailures("sshuttle", nextFailures) {
+				return
+			}
 			time.Sleep(10 * time.Second)
 			log.Debug().Msgf("Restarting sshuttle ...")
-			_ = startSshuttle(req)
+			_ = startSshuttleWithFailures(req, nextFailures)
 		}
 	}()
 

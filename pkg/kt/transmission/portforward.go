@@ -18,10 +18,10 @@ import (
 // SetupPortForwardToLocal mapping local port to shadow pod ssh port
 func SetupPortForwardToLocal(podName string, remotePort, localPort int) (chan int, error) {
 	gone := make(chan int)
-	return gone, setupPortForwardToLocal(podName, remotePort, localPort, gone, true)
+	return gone, setupPortForwardToLocal(podName, remotePort, localPort, gone, true, 0)
 }
 
-func setupPortForwardToLocal(podName string, remotePort, localPort int, gone chan int, isInitConnect bool) error {
+func setupPortForwardToLocal(podName string, remotePort, localPort int, gone chan int, isInitConnect bool, failures int) error {
 	ready := make(chan struct{})
 	var ticker *time.Ticker
 	go func() {
@@ -29,9 +29,19 @@ func setupPortForwardToLocal(podName string, remotePort, localPort int, gone cha
 		fw, err := createPortForwarder(podName, remotePort, localPort, stop, ready)
 		if err != nil {
 			log.Warn().Err(err).Msgf("Invalid port forward parameter")
+			if !isInitConnect {
+				nextFailures := nextReconnectFailures(failures, false)
+				if ExitAfterRepeatedReconnectFailures("Port forward", nextFailures) {
+					return
+				}
+				time.Sleep(time.Duration(opt.Get().Global.PortForwardTimeout) * time.Second)
+				log.Debug().Msgf("Port forward reconnecting ...")
+				_ = setupPortForwardToLocal(podName, remotePort, localPort, gone, false, nextFailures)
+			}
 			return
 		}
 		// will hang here
+		started := time.Now()
 		err = fw.ForwardPorts()
 		if err != nil {
 			if isInitConnect {
@@ -43,9 +53,13 @@ func setupPortForwardToLocal(podName string, remotePort, localPort int, gone cha
 		if ticker != nil {
 			ticker.Stop()
 		}
+		nextFailures := nextReconnectFailures(failures, time.Since(started) >= reconnectStableDuration)
+		if ExitAfterRepeatedReconnectFailures("Port forward", nextFailures) {
+			return
+		}
 		time.Sleep(time.Duration(opt.Get().Global.PortForwardTimeout) * time.Second)
 		log.Debug().Msgf("Port forward reconnecting ...")
-		_ = setupPortForwardToLocal(podName, remotePort, localPort, gone, false)
+		_ = setupPortForwardToLocal(podName, remotePort, localPort, gone, false, nextFailures)
 	}()
 
 	select {
