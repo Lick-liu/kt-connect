@@ -1,4 +1,4 @@
-PREFIX			  ?= registry.cn-hangzhou.aliyuncs.com/rdc-incubator
+PREFIX			  ?= registry.cn-chengdu.aliyuncs.com/zodancer
 TAG				  ?= dev
 SHADOW_IMAGE	  =  kt-connect-shadow
 SHADOW_BASE_IMAGE =  shadow-base
@@ -26,9 +26,9 @@ check:
 # build ktctl
 ktctl:
 	go mod download
-	GOARCH=amd64 GOOS=linux go build -ldflags "-s -w -X main.version=${TAG}" -o artifacts/linux/ktctl ./cmd/ktctl
-	GOARCH=amd64 GOOS=darwin go build -ldflags "-s -w -X main.version=${TAG}" -o artifacts/macos/ktctl ./cmd/ktctl
-	GOARCH=amd64 GOOS=windows go build -ldflags "-s -w -X main.version=${TAG}" -o artifacts/windows/ktctl.exe ./cmd/ktctl
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -ldflags "-s -w -X main.version=${TAG}" -o artifacts/linux/ktctl ./cmd/ktctl
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=darwin go build -ldflags "-s -w -X main.version=${TAG}" -o artifacts/macos/ktctl ./cmd/ktctl
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=windows go build -ldflags "-s -w -X main.version=${TAG}" -o artifacts/windows/ktctl.exe ./cmd/ktctl
 
 # minimize binary size
 upx:
@@ -40,7 +40,7 @@ shadow-base:
 
 # build shadow image
 shadow:
-	GOARCH=amd64 GOOS=linux go build -gcflags "all=-N -l" -o artifacts/shadow/shadow-linux-amd64 cmd/shadow/main.go
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -gcflags "all=-N -l" -o artifacts/shadow/shadow-linux-amd64 cmd/shadow/main.go
 	docker build -t $(PREFIX)/$(SHADOW_IMAGE):$(TAG) -f build/docker/shadow/Dockerfile .
 
 # shadow with dlv
@@ -54,8 +54,25 @@ shadow-local:
 
 # build router image
 router:
-	GOARCH=amd64 GOOS=linux go build -gcflags "all=-N -l" -o artifacts/router/router-linux-amd64 cmd/router/main.go
+	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -gcflags "all=-N -l" -o artifacts/router/router-linux-amd64 cmd/router/main.go
 	docker build -t $(PREFIX)/$(ROUTER_IMAGE):$(TAG) -f build/docker/router/Dockerfile .
+
+# build shadow and router images
+images: shadow router
+
+# push shadow image
+push-shadow:
+	docker push $(PREFIX)/$(SHADOW_IMAGE):$(TAG)
+
+# push router image
+push-router:
+	docker push $(PREFIX)/$(ROUTER_IMAGE):$(TAG)
+
+# push shadow and router images
+push-images: push-shadow push-router
+
+# build and push shadow and router images
+release-images: images push-images
 
 # build this image before navigator
 navigator-base:

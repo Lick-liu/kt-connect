@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 NS="kt-integration-test"
-SHADOW_IMAGE="registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-shadow:vdev"
-ROUTER_IMAGE="registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-router:vdev"
+SHADOW_IMAGE="registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-shadow:v1.1"
+ROUTER_IMAGE="registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-router:v1.1"
 DOCKER_HOST=""
 DNS_MODE="localDNS"
 CONNECT_MODE="tun2socks"

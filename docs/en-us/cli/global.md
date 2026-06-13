@@ -13,7 +13,7 @@ Available options:
 ```text
 --namespace value, -n value   Specify target namespace (otherwise follow kubeconfig current context)
 --kubeconfig value, -c value  Specify path of KubeConfig file (default: "/Users/flin/.kube/config")
---image value, -i value       Customize shadow image (default: "registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-shadow:vdev")
+   --image value, -i value       Customize shadow image (default: "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-shadow:v1.1")
 --imagePullSecret value       Custom image pull secret
 --serviceAccount value        Specify ServiceAccount name for shadow pod (default: "default")
 --nodeSelector value          Specify location of shadow and route pod by node label, e.g. 'disk=ssd,region=hangzhou'

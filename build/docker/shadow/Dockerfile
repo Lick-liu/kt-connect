@@ -4,7 +4,8 @@ COPY artifacts/shadow/shadow-linux-amd64 /usr/sbin/shadow
 COPY build/docker/shadow/run.sh /run.sh
 COPY build/docker/shadow/disconnect.sh /disconnect.sh
 
-RUN chmod 755 /disconnect.sh && \
+RUN sed -i 's/\r$//' /run.sh /disconnect.sh && \
+    chmod 755 /disconnect.sh && \
     chmod 755 /run.sh
 
 ENTRYPOINT ["/run.sh"]

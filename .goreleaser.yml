@@ -27,6 +27,8 @@ builds:
       - linux
     goarch:
       - amd64
+    env:
+      - CGO_ENABLED=0
   - id: "router"
     main: ./cmd/router/main.go
     binary: artifacts/router/router-linux-amd64
@@ -34,6 +36,8 @@ builds:
       - linux
     goarch:
       - amd64
+    env:
+      - CGO_ENABLED=0
   - id: "navigator"
     main: ./cmd/navigator/main.go
     binary: artifacts/navigator/navigator-linux-amd64
@@ -47,9 +51,10 @@ dockers:
     ids:
       - shadow
     image_templates:
-      - "registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-shadow:latest"
-      - "registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-shadow:{{ .Tag }}"
-      - "registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-shadow:v{{ .Major }}"
+      - "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-shadow:latest"
+      - "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-shadow:{{ .Tag }}"
+      - "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-shadow:v{{ .Major }}.{{ .Minor }}"
+      - "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-shadow:v{{ .Major }}"
     dockerfile: artifacts/docker/shadow/Dockerfile
     skip_push: false
     extra_files:
@@ -60,9 +65,10 @@ dockers:
     ids:
       - router
     image_templates:
-      - "registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-router:latest"
-      - "registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-router:{{ .Tag }}"
-      - "registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-router:v{{ .Major }}"
+      - "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-router:latest"
+      - "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-router:{{ .Tag }}"
+      - "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-router:v{{ .Major }}.{{ .Minor }}"
+      - "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-router:v{{ .Major }}"
     dockerfile: artifacts/docker/router/Dockerfile
     skip_push: false
     extra_files:
