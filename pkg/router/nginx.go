@@ -124,11 +124,13 @@ func replaceRouteConf(path string, content []byte) error {
 	if err = tmp.Close(); err != nil {
 		return fmt.Errorf("failed to close temporary route configuration: %s", err)
 	}
-	if err = os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to replace route configuration: %s", err)
-	}
 	if err = os.Rename(tmpName, path); err != nil {
-		return fmt.Errorf("failed to install route configuration: %s", err)
+		if removeErr := os.Remove(path); removeErr != nil && !os.IsNotExist(removeErr) {
+			return fmt.Errorf("failed to replace route configuration: %s", removeErr)
+		}
+		if err = os.Rename(tmpName, path); err != nil {
+			return fmt.Errorf("failed to install route configuration: %s", err)
+		}
 	}
 	return nil
 }
