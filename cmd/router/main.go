@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/alibaba/kt-connect/pkg/router"
 	"github.com/gofrs/flock"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"net"
 	"os"
 	"strings"
 )
@@ -19,6 +21,9 @@ const pathKtLock = "/var/kt.lock"
 const actionSetup = "setup"
 const actionAdd = "add"
 const actionRemove = "remove"
+const meshServiceInfix = "-kt-mesh-"
+
+type meshServiceResolver func(string) (bool, error)
 
 func main() {
 	fileLock := flock.New(pathKtLock)
@@ -64,14 +69,12 @@ func setup(args []string) {
 		Header:   header,
 		Versions: []string{version},
 	}
-	err := router.WriteKtConf(&ktConf)
-	if err != nil {
-		log.Error().Err(err).Msgf("Write kt config failed")
+	if err := router.WriteAndReloadRouteConf(&ktConf); err != nil {
+		log.Error().Err(err).Msgf("Write and load route config failed")
 		return
 	}
-	err = router.WriteAndReloadRouteConf(&ktConf)
-	if err != nil {
-		log.Error().Err(err).Msgf("Write and load route config failed")
+	if err := router.WriteKtConf(&ktConf); err != nil {
+		log.Error().Err(err).Msgf("Write kt config failed")
 		return
 	}
 	log.Info().Msgf("Route setup completed.")
@@ -124,11 +127,12 @@ func updateRoute(header, version, action string) error {
 	case actionRemove:
 		ktConf.Versions = removeVersion(ktConf.Versions, version)
 	}
-	err = router.WriteKtConf(ktConf)
+	ktConf.Versions = pruneUnavailableVersions(ktConf.Service, ktConf.Versions, resolveMeshService)
+	err = router.WriteAndReloadRouteConf(ktConf)
 	if err != nil {
 		return err
 	}
-	err = router.WriteAndReloadRouteConf(ktConf)
+	err = router.WriteKtConf(ktConf)
 	if err != nil {
 		return err
 	}
@@ -145,11 +149,51 @@ func addVersion(versions []string, version string) []string {
 }
 
 func removeVersion(versions []string, version string) []string {
-	remaining := versions[:0]
+	remaining := make([]string, 0, len(versions))
 	for _, v := range versions {
 		if v != version {
 			remaining = append(remaining, v)
 		}
 	}
 	return remaining
+}
+
+func pruneUnavailableVersions(service string, versions []string, resolver meshServiceResolver) []string {
+	available := make([]string, 0, len(versions))
+	seen := make(map[string]struct{}, len(versions))
+	for _, version := range versions {
+		if _, ok := seen[version]; ok {
+			continue
+		}
+		seen[version] = struct{}{}
+
+		meshService := meshServiceName(service, version)
+		exists, err := resolver(meshService)
+		if err != nil {
+			log.Warn().Err(err).Msgf("Unable to resolve mesh service %s, keep version %s", meshService, version)
+			available = append(available, version)
+			continue
+		}
+		if !exists {
+			log.Warn().Msgf("Prune stale mesh version %s because service %s does not exist", version, meshService)
+			continue
+		}
+		available = append(available, version)
+	}
+	return available
+}
+
+func meshServiceName(service, version string) string {
+	return service + meshServiceInfix + version
+}
+
+func resolveMeshService(service string) (bool, error) {
+	if _, err := net.LookupHost(service); err != nil {
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
