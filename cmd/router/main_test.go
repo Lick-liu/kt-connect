@@ -46,12 +46,36 @@ func TestPruneUnavailableVersionsDropsOnlyMissingMeshServices(t *testing.T) {
 		return false, nil
 	}
 
-	got := pruneUnavailableVersions("tea-shop-merchant-be-biz", versions, resolver)
+	got := pruneUnavailableVersions("tea-shop-merchant-be-biz", versions, "", resolver)
 	want := []string{"live", "uncertain"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("pruneUnavailableVersions got %v, want %v", got, want)
 	}
 	if !reflect.DeepEqual(versions, []string{"stale", "live", "uncertain"}) {
 		t.Fatalf("pruneUnavailableVersions mutated input: %v", versions)
+	}
+}
+
+func TestPruneUnavailableVersionsNeverDropsVersionBeingAdded(t *testing.T) {
+	// Simulates DNS negative cache: the service of the version just added
+	// resolves as missing, but it must be kept anyway.
+	versions := []string{"stale", "jzhome"}
+	resolver := func(name string) (bool, error) {
+		if name == "svc-kt-mesh-jzhome" {
+			t.Fatalf("version being added should not be resolved at all")
+		}
+		return false, nil
+	}
+
+	got := pruneUnavailableVersions("svc", versions, "jzhome", resolver)
+	want := []string{"jzhome"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("pruneUnavailableVersions got %v, want %v", got, want)
+	}
+}
+
+func TestSetupRejectsInsufficientArguments(t *testing.T) {
+	if err := setup([]string{"svc", "8080:8080"}); err == nil {
+		t.Fatalf("setup should fail with insufficient arguments")
 	}
 }
