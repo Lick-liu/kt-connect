@@ -12,20 +12,23 @@ import (
 const IpAddrPattern = "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+"
 
 // GetRandomTcpPort get pod random ssh port
+// Probe with net.Listen rather than net.Dial: a port inside an OS-excluded
+// range (e.g. Windows Hyper-V reserved port ranges) accepts no connection,
+// so dialing reports it as "free" while listening on it still fails.
 func GetRandomTcpPort() int {
+	port := 0
 	for i := 0; i < 20; i++ {
-		port := RandomPort()
-		conn, err := net.Dial("tcp", fmt.Sprintf(":%d", port))
-		if err == nil {
-			log.Debug().Msgf("Port %d not available", port)
-			_ = conn.Close()
-		} else {
-			log.Debug().Msgf("Using port %d", port)
-			return port
+		port = RandomPort()
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		if err != nil {
+			log.Debug().Msgf("Port %d not available: %s", port, err)
+			continue
 		}
+		_ = listener.Close()
+		log.Debug().Msgf("Using port %d", port)
+		return port
 	}
-	port := RandomPort()
-	log.Info().Msgf("Using random port %d", port)
+	log.Warn().Msgf("No verified free port found, using random port %d", port)
 	return port
 }
 
