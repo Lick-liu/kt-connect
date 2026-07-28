@@ -89,7 +89,7 @@ archives:
   - id: ktctl
     builds:
       - ktctl
-    name_template: 'ktctl_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    name_template: 'ktctl_{{ .Version }}_{{ if eq .Os "darwin" }}MacOS{{ else if eq .Os "linux" }}Linux{{ else if eq .Os "windows" }}Windows{{ else }}{{ .Os }}{{ end }}_{{ if eq .Arch "386" }}i386{{ else if eq .Arch "amd64" }}x86_64{{ else if eq .Arch "arm64" }}arm_64{{ else }}{{ .Arch }}{{ end }}'
     format: tar.gz
     format_overrides:
       - goos: windows
@@ -98,13 +98,6 @@ archives:
       - src: 'artifacts/{{ .Os }}/{{ .Arch }}/*'
         dst: .
         strip_parent: true
-    replacements:
-      darwin: MacOS
-      linux: Linux
-      windows: Windows
-      386: i386
-      amd64: x86_64
-      arm64: arm_64
 checksum:
   name_template: '{{ .Tag }}_checksums.txt'
 snapshot:
