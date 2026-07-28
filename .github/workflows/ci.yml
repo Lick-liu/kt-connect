@@ -86,7 +86,7 @@ jobs:
       uses: goreleaser/goreleaser-action@v6
       with:
         version: v1.26.2
-        args: release --snapshot --skip-publish --clean
+        args: release --snapshot --skip=docker --clean
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
