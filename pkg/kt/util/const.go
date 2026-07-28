@@ -23,6 +23,9 @@ const (
 	ImageKtShadow = "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-shadow"
 	// ImageKtRouter default router image
 	ImageKtRouter = "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-router"
+	// DefaultKtRuntimeImageTag is the latest published shadow/router image tag.
+	// Client-only builds may have a newer version without matching cluster images.
+	DefaultKtRuntimeImageTag = "v1.2"
 	// ImageKtNavigator default navigator image
 	ImageKtNavigator = "registry.cn-hangzhou.aliyuncs.com/rdc-incubator/kt-connect-navigator"
 

@@ -27,7 +27,7 @@ func GlobalFlags() []OptionConfig {
 		{
 			Target:       "Image",
 			Alias:        "i",
-			DefaultValue: fmt.Sprintf("%s:v%s", util.ImageKtShadow, Store.Version),
+			DefaultValue: fmt.Sprintf("%s:%s", util.ImageKtShadow, util.DefaultKtRuntimeImageTag),
 			Description:  "Customize shadow image",
 		},
 		{
