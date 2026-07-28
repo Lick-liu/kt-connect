@@ -30,7 +30,7 @@ func MeshFlags() []OptionConfig {
 		},
 		{
 			Target:       "RouterImage",
-			DefaultValue: fmt.Sprintf("%s:v%s", util.ImageKtRouter, Store.Version),
+			DefaultValue: fmt.Sprintf("%s:%s", util.ImageKtRouter, util.DefaultKtRuntimeImageTag),
 			Description:  "(auto method only) Customize router image",
 		},
 	}

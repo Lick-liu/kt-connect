@@ -18,6 +18,10 @@ import (
 
 type SocksLogger struct{}
 
+const localDialTimeout = 500 * time.Millisecond
+
+type localDialer func(network, address string, timeout time.Duration) (net.Conn, error)
+
 func (s SocksLogger) Println(v ...any) {
 	_, _ = util.BackgroundLogger.Write([]byte(fmt.Sprint(v...) + util.Eol))
 }
@@ -118,6 +122,10 @@ func disconnectRemotePort(privateKey, sshAddress, remoteEndpoint string, c *Cli)
 }
 
 func handleRequest(listener net.Listener, localEndpoint string) error {
+	return handleRequestWithDial(listener, localEndpoint, net.DialTimeout)
+}
+
+func handleRequestWithDial(listener net.Listener, localEndpoint string, dial localDialer) error {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error().Msgf("Failed to handle request: %v", r)
@@ -134,17 +142,24 @@ func handleRequest(listener net.Listener, localEndpoint string) error {
 		return err
 	}
 
+	// Never connect to the local service in the accept loop. A stopped or
+	// black-holed local port can make Dial block for seconds; doing that here
+	// serializes every remote request behind the previous failure and produces
+	// staircase latency under concurrent load.
+	go connectLocalAndHandle(client, localEndpoint, dial)
+	return nil
+}
+
+func connectLocalAndHandle(client net.Conn, localEndpoint string, dial localDialer) {
 	// Open a (local) connection to localEndpoint whose content will be forwarded to remoteEndpoint
-	local, err := net.Dial("tcp", localEndpoint)
+	local, err := dial("tcp", localEndpoint, localDialTimeout)
 	if err != nil {
 		_ = client.Close()
 		log.Error().Err(err).Msgf("Local service error")
-		return err
+		return
 	}
 
-	// Handle request in individual coroutine, current coroutine continue to accept more requests
-	go handleClient(client, local)
-	return nil
+	handleClient(client, local)
 }
 
 func handleClient(client net.Conn, remote net.Conn) {

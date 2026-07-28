@@ -14,6 +14,9 @@ func TestDefaultKtImagesUseChengduRegistry(t *testing.T) {
 	if ImageKtRouter != "registry.cn-chengdu.aliyuncs.com/zodancer/kt-connect-router" {
 		t.Fatalf("ImageKtRouter = %q", ImageKtRouter)
 	}
+	if DefaultKtRuntimeImageTag != "v1.2" {
+		t.Fatalf("DefaultKtRuntimeImageTag = %q", DefaultKtRuntimeImageTag)
+	}
 }
 
 func TestImageBuildConfigMatchesDefaultKtImages(t *testing.T) {
